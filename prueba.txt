@@ -1,0 +1,21 @@
+A Entero;    
+suma Entero;
+pi Real;
+num2 Entero;
+num3 Entero;    
+
+num1 Entero;
+nombre Texto;
+n1 Real;
+asis Logico;
+nombre= Captura.Texto();
+n1= Captura.Real();
+num1= Captura.Entero();
+asis=Captura.Logico();
+A=b;
+suma=num1+(num2*num3);
+nombre="Alejandra";
+pi=3.1416;
+Mensaje.Texto("Esto es una prueba");
+Mensaje.Texto("Hola mundo");
+
