@@ -1,40 +1,125 @@
-Proyecto: compilador costeñol
+# Proyecto: Compilador Costeñol
 
-integrantes :
-Emanuel Orozco
-Vanelly Ariza
-Yimileth Manga
+**Integrantes:**
+- Emanuel Orozco
+- Vanelly Ariza
+- Yimileth Manga
 
+---
 
-📝 Descripción hasta ahora 25%
-Este proyecto consiste en un Analizador Léxico desarrollado en Python. Su función es leer un archivo de código fuente de izquierda a derecha y descomponerlo en una serie de Tokens clasificados. El script identifica palabras reservadas, tipos de datos, identificadores, operadores y delimitadores.
+## 📝 Descripción
 
-📁 Contenido del Proyecto
-tokens.py: Script principal que contiene la lógica del analizador.
+Este proyecto es un compilador para el lenguaje **Costeñol**, desarrollado en Python. Incluye un analizador léxico, un analizador sintáctico, una tabla de símbolos y una interfaz gráfica (IDE) para escribir, compilar y guardar código Costeñol.
 
-prueba.txt: Archivo de texto que contiene el código fuente que será evaluado.
+---
 
-README.md: Este documento explicativo.
+## 📁 Contenido del Proyecto
 
-🚀 Instrucciones de Ejecución
-Requisitos previos
-Tener instalado Python 3.10 o superior.
+| Archivo | Descripción |
+|---|---|
+| `compi.py` | Núcleo del compilador: tokenizador, analizador sintáctico y tabla de símbolos |
+| `ide.py` | Interfaz gráfica del IDE construida con CustomTkinter |
+| `tokens.py` | Script auxiliar del analizador léxico |
+| `prueba.txt` | Archivo de ejemplo con código fuente Costeñol |
+| `README.md` | Este documento |
 
-Pasos para correr el proyecto
-Asegúrate de que los archivos tokens.py y prueba.txt estén en la misma carpeta.
+---
 
-Abre una terminal 
+## 🚀 Instrucciones de Ejecución
 
-Ubícate en la carpeta donde guardaste los archivos usando el comando "cd". Por ejemplo:
-python tokens.py
+### Requisitos previos
 
-📊 Especificaciones del Lenguaje
-El analizador reconoce las siguientes estructuras:
+- Python 3.10 o superior
+- Librería `customtkinter`
 
-Tipos: Entero, Real, Texto, Logico.
+### Instalación de dependencias
 
-Comandos: Captura.TipoDato(), Mensaje.Texto().
+```bash
+pip install customtkinter
+```
 
-Símbolos: =, ;, +, *, (, ).
+### Correr el IDE gráfico
 
-Literales: Cadenas entre comillas ("...") y valores numéricos.
+```bash
+python ide.py
+```
+
+### Correr el compilador en consola (sin interfaz)
+
+```bash
+python compi.py
+```
+
+---
+
+## 🖥️ Funcionalidades del IDE
+
+El IDE cuenta con las siguientes características:
+
+- **Editor de código** con numeración de líneas y resaltado de sintaxis en tiempo real
+- **▶ Compilar** — ejecuta el análisis léxico + sintáctico completo y muestra los resultados
+- **🔍 Solo Léxico** — muestra únicamente los tokens identificados por línea
+- **📋 Tabla de Símbolos** — lista todas las variables declaradas con su tipo, valor y estado de inicialización
+- **❌ Errores** — resumen de todos los errores léxicos, sintácticos y semánticos encontrados
+- **📂 Abrir** — carga un archivo de código desde el sistema de archivos
+- **💾 Guardar** — exporta el código como archivo `.pqpk` (formato nativo Costeñol)
+- **📋 Ejemplo** — carga un código de ejemplo predefinido
+- **🗑 Limpiar** — limpia el editor y todos los paneles de resultados
+
+### Formato de guardado
+
+Al guardar, el IDE exporta el archivo con extensión **`.pqpk`**, que es el formato nativo del lenguaje Costeñol. También es posible guardar como `.txt` desde el mismo diálogo.
+
+---
+
+## 📊 Especificaciones del Lenguaje
+
+### Tipos de dato
+
+| Tipo | Descripción |
+|---|---|
+| `Entero` | Número entero |
+| `Real` | Número decimal |
+| `Texto` | Cadena de caracteres |
+| `Logico` | Valor booleano (`verdadero` / `falso`) |
+
+### Sentencias soportadas
+
+```
+# Declaración de variable
+nombre Tipo;
+
+# Captura de entrada
+variable= Captura.Tipo();
+
+# Asignación
+variable=expresion;
+
+# Salida por pantalla
+Mensaje.Texto("texto");
+```
+
+### Operadores
+
+`+`, `-`, `*`, `/`, `=`, `==`, `!=`, `<`, `>`, `<=`, `>=`
+
+### Ejemplo de código Costeñol
+
+```
+num1 Entero;
+nombre Texto;
+pi Real;
+num1= Captura.Entero();
+nombre="Alejandra";
+pi=3,1416;
+Mensaje.Texto("Hola mundo");
+```
+
+---
+
+## ⚙️ Fases del Compilador
+
+1. **Análisis Léxico** — divide el código en tokens clasificados (tipos, identificadores, literales, operadores, etc.)
+2. **Análisis Sintáctico** — verifica que las sentencias sigan la gramática del lenguaje
+3. **Análisis Semántico** — comprueba que las variables estén declaradas antes de usarse y que los tipos sean compatibles
+4. **Tabla de Símbolos** — registra todas las variables con su tipo, valor asignado y línea de declaración

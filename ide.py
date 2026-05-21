@@ -348,7 +348,6 @@ class CosteñolIDE(ctk.CTk):
 
         self.tabs.set("🔨 Compilación")
         self.lbl_estado.configure(text="✅ Compilación completada.")
-
     def _renderizar_salida_compilador(self, widget, texto):
         for linea in texto.split("\n"):
             if "=" * 10 in linea:
@@ -371,6 +370,9 @@ class CosteñolIDE(ctk.CTk):
                     if i < len(partes) - 1:
                         self._escribir(widget, " → ", "dim")
                 self._escribir(widget, "\n")
+            elif linea.strip().startswith("Salida :"):
+                self._escribir(widget, "  Salida : ", "dim")
+                self._escribir(widget, linea.strip()[8:].strip() + "\n", "mensaje")
             else:
                 self._escribir(widget, linea + "\n")
 
@@ -528,8 +530,8 @@ class CosteñolIDE(ctk.CTk):
 
     def _guardar_archivo(self):
         ruta = filedialog.asksaveasfilename(
-            defaultextension=".txt",
-            filetypes=[("Archivos de texto", "*.txt *.cos"), ("Todos", "*.*")])
+            defaultextension=".pqpk",
+            filetypes=[("Archivo Costeñol", "*.pqpk"), ("Archivos de texto", "*.txt"), ("Todos", "*.*")])
         if ruta:
             with open(ruta, "w", encoding="utf-8") as f:
                 f.write(self._get_codigo())
