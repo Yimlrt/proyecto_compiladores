@@ -1,6 +1,51 @@
 import re
+import random
 from dataclasses import dataclass, field
 from typing import Optional
+
+
+# ── Mensajes con dialecto barranquillero ──────────────────────────────────────
+_MSGS_OK = [
+    "¡Eso ta' fino, llave!",
+    "¡Ajá, así es como se hace, mano!",
+    "¡Qué molleja, salió perfecto!",
+    "¡Bien puesta esa vaina, pana!",
+    "¡Ta' bueno eso, mijo!",
+    "¡Eso quedó de pelos, hermano!",
+]
+_MSGS_ERROR_LEX = [
+    "¡Epa! Ahí hay un carácter que no es ni chicha ni limonada",
+    "¡Uy, llave! Ese símbolo no lo conoce ni el compilador",
+    "¡Ajá! ¿Y eso qué es? Eso no va ahí, mano",
+    "¡Mano, ese carácter no pinta nada ahí!",
+]
+_MSGS_ERROR_SIN = [
+    "¡Se dañó la vaina! La sintaxis está barro",
+    "¡Epa, llave! Eso no está bien escrito",
+    "¡Ajá! ¿Qué fue lo que pusiste ahí? No cuadra",
+    "¡Mano, eso está mal armado, vuelve y mira!",
+]
+_MSGS_ERROR_SEM = [
+    "¡Uy, mano! Esa variable no la has presentado todavía",
+    "¡Mano, los tipos no casan ni amarrados!",
+    "¡Ajá! ¿Y esa variable de dónde salió, llave?",
+    "¡Eso está barro, mijo! Revisa los tipos que usaste",
+]
+_MSGS_FINAL_OK = [
+    "¡Bacano, llave! El código quedó fino fino 🎉",
+    "¡Eso sí está de aquellas, llave! Cero errores 🌊",
+    "¡Ajá, así se hace! Todo limpio, mano 🎉",
+    "¡Qué molleja de código tan bonito! Sin un solo error 🌊",
+]
+_MSGS_FINAL_ERR = [
+    "¡Epa! Quedó barro, mano. Hay {n} error(es) que arreglar",
+    "¡Ajá! Eso tiene {n} problema(s), llave. ¡A dale!",
+    "¡Mano, {n} error(es)! Eso está más enredao que un partido del Junior",
+    "¡Uy, pana! {n} error(es). Vuelve y revisa eso con cuidado",
+]
+
+def _msg(lista: list[str], **kw) -> str:
+    return random.choice(lista).format(**kw)
 
 
 TOKENS_DEF = [
@@ -53,7 +98,7 @@ def tokenizar(linea: str, num_linea: int = 0) -> tuple[list[Token], list[str]]:
         if tipo == "ESPACIO":
             continue
         if tipo == "DESCONOCIDO":
-            errores.append(f"  ERROR LÉXICO en posición {pos}: carácter inesperado '{valor}'")
+            errores.append(f"  ERROR LÉXICO: {_msg(_MSGS_ERROR_LEX)} — carácter inesperado '{valor}' en posición {pos}")
             continue
         tokens.append(Token(tipo, valor, pos, num_linea))
     return tokens, errores
@@ -68,6 +113,7 @@ class Simbolo:
     valor: Optional[str] = None
     linea_declaracion: int = 0
     inicializado: bool = False
+    ultimo_valor_numerico: Optional[str] = None  # último valor literal conocido antes de Captura
 
 
 class TablaSimbolos:
@@ -83,6 +129,12 @@ class TablaSimbolos:
     def asignar(self, nombre: str, valor: str) -> tuple[bool, str]:
         if nombre not in self._tabla:
             return False, f"Variable '{nombre}' no declarada."
+        # Guardar el último valor numérico conocido antes de que Captura lo sobreescriba
+        try:
+            float(valor.replace(",", "."))
+            self._tabla[nombre].ultimo_valor_numerico = valor
+        except (ValueError, AttributeError):
+            pass
         self._tabla[nombre].valor = valor
         self._tabla[nombre].inicializado = True
         return True, "OK"
@@ -137,7 +189,7 @@ class AnalizadorSintactico:
             return t
         esperado = tipo_esperado
         obtenido = f"{t.tipo}('{t.valor}')" if t else "fin de línea"
-        self.errores.append(f"  ERROR SINTÁCTICO: se esperaba {esperado}, se obtuvo {obtenido}")
+        self.errores.append(f"  ERROR SINTÁCTICO: {_msg(_MSGS_ERROR_SIN)} — se esperaba {esperado}, se obtuvo {obtenido}")
         return None
 
     def analizar(self, tokens: list[Token]) -> tuple[str, list[str]]:
@@ -174,7 +226,7 @@ class AnalizadorSintactico:
         if t.tipo == "MENSAJE_TEXTO":
             return self._salida()
 
-        self.errores.append(f"  ERROR SINTÁCTICO: sentencia no reconocida, empieza con {t.tipo}('{t.valor}')")
+        self.errores.append(f"  ERROR SINTÁCTICO: {_msg(_MSGS_ERROR_SIN)} — sentencia no reconocida, empieza con {t.tipo}('{t.valor}')")
         return "DESCONOCIDO", self.errores
 
     def _ver_siguiente(self, tipo: str) -> bool:
@@ -190,7 +242,7 @@ class AnalizadorSintactico:
         if not self.errores and id_tok and tip_tok:
             ok, msg = self.tabla.declarar(id_tok.valor, tip_tok.valor, id_tok.linea)
             if not ok:
-                self.errores.append(f"  ERROR SEMÁNTICO: {msg}")
+                self.errores.append(f"  ERROR SEMÁNTICO: {_msg(_MSGS_ERROR_SEM)} — {msg}")
         return "DECLARACION", self.errores
 
     def _captura(self) -> tuple[str, list[str]]:
@@ -201,63 +253,131 @@ class AnalizadorSintactico:
         if not self.errores and id_tok and cap_tok:
             # verificar que la variable esté declarada
             if not self.tabla.existe(id_tok.valor):
-                self.errores.append(f"  ERROR SEMÁNTICO: variable '{id_tok.valor}' no declarada antes de usarla.")
+                self.errores.append(f"  ERROR SEMÁNTICO: {_msg(_MSGS_ERROR_SEM)} — variable '{id_tok.valor}' no declarada antes de usarla.")
             else:
-                # verificar compatibilidad de tipo
+                # verificar compatibilidad de tipo — es ERROR, no advertencia
                 tipo_captura = re.search(r'\.(Entero|Real|Texto|Logico)', cap_tok.valor).group(1)
                 sim = self.tabla.obtener(id_tok.valor)
                 if sim.tipo != tipo_captura:
                     self.errores.append(
-                        f"  ADVERTENCIA TIPO: '{id_tok.valor}' es {sim.tipo} "
-                        f"pero se captura como {tipo_captura}."
+                        f"  ERROR SEMÁNTICO: {_msg(_MSGS_ERROR_SEM)} — '{id_tok.valor}' declarada como {sim.tipo} "
+                        f"pero se intenta capturar como {tipo_captura}. ¡Los tipos no cuadran, llave!"
                     )
-                self.tabla.asignar(id_tok.valor, f"Captura.{tipo_captura}()")
+                else:
+                    self.tabla.asignar(id_tok.valor, f"Captura.{tipo_captura}()")
         return "CAPTURA", self.errores
 
     def _asignacion(self) -> tuple[str, list[str]]:
         id_tok = self.consumir("IDENTIFICADOR")
         self.consumir("ASIGNACION")
-        expr_val = self._expr()
+        # recolectar tokens de la expresión para validación de tipos
+        expr_tokens = []
+        while self.actual() and self.actual().tipo != "PUNTO_COMA":
+            expr_tokens.append(self.actual())
+            self.pos += 1
+        # reconstruir expr con paréntesis para eval
+        expr_str = "".join(t.valor for t in expr_tokens)
         self.consumir("PUNTO_COMA")
+
         if not self.errores and id_tok:
             if not self.tabla.existe(id_tok.valor):
                 self.errores.append(
-                    f"  ADVERTENCIA: variable '{id_tok.valor}' no declarada "
-                    f"(asignación implícita no recomendada)."
+                    f"  ERROR SEMÁNTICO: {_msg(_MSGS_ERROR_SEM)} — variable '{id_tok.valor}' no declarada."
                 )
             else:
-                # intentar evaluar numéricamente sustituyendo valores conocidos
-                valor_evaluado = self._evaluar_expr(expr_val)
-                self.tabla.asignar(id_tok.valor, valor_evaluado)
+                # ── validar tipos de los identificadores en la expresión ──────
+                sim_dest = self.tabla.obtener(id_tok.valor)
+                for et in expr_tokens:
+                    if et.tipo == "IDENTIFICADOR":
+                        if not self.tabla.existe(et.valor):
+                            self.errores.append(
+                                f"  ERROR SEMÁNTICO: {_msg(_MSGS_ERROR_SEM)} — variable '{et.valor}' usada pero no declarada."
+                            )
+                        else:
+                            sim_op = self.tabla.obtener(et.valor)
+                            # verificar que esté inicializada antes de usarla
+                            if not sim_op.inicializado:
+                                self.errores.append(
+                                    f"  ERROR SEMÁNTICO: ¡Epa, llave! La variable '{et.valor}' está declarada "
+                                    f"pero nunca le diste un valor. ¡No la puedes usar así!"
+                                )
+                            # operaciones aritméticas solo con Entero/Real
+                            hay_operador = any(t.tipo == "OPERADOR" for t in expr_tokens)
+                            if hay_operador and sim_op.tipo not in ("Entero", "Real"):
+                                self.errores.append(
+                                    f"  ERROR SEMÁNTICO: {_msg(_MSGS_ERROR_SEM)} — '{et.valor}' es de tipo "
+                                    f"{sim_op.tipo} y no puede usarse en operaciones aritméticas."
+                                )
+                if not self.errores:
+                    valor_evaluado = self._evaluar_expr(expr_str)
+                    # si no se pudo evaluar, guardar expresión legible con espacios
+                    if valor_evaluado == expr_str:
+                        valor_evaluado = self._expr_legible(expr_tokens)
+                    self.tabla.asignar(id_tok.valor, valor_evaluado)
         return "ASIGNACION", self.errores
+
+    def _expr_legible(self, tokens: list) -> str:
+        """Construye una representación legible de la expresión con espacios."""
+        partes = []
+        for t in tokens:
+            if t.tipo == "OPERADOR":
+                partes.append(f" {t.valor} ")
+            elif t.tipo == "PARENTESIS_AP":
+                partes.append("(")
+            elif t.tipo == "PARENTESIS_CI":
+                partes.append(")")
+            else:
+                partes.append(t.valor)
+        return "".join(partes)
 
     def _evaluar_expr(self, expr: str) -> str:
         """
         Intenta evaluar una expresión sustituyendo variables por sus valores
-        numéricos conocidos en la tabla de símbolos. Si no puede, devuelve
-        la expresión original como texto.
+        numéricos conocidos en la tabla de símbolos.
+        Sustituye lo que puede aunque no pueda evaluar todo.
         """
         expr_eval = expr
-        # sustituir cada identificador por su valor numérico si está disponible
         for nombre, sim in self.tabla._tabla.items():
-            if sim.valor is not None:
-                val = sim.valor.replace(",", ".")
-                try:
-                    float(val)  # solo sustituir si el valor es numérico
-                    # reemplazar palabra completa
-                    expr_eval = re.sub(rf'\b{re.escape(nombre)}\b', val, expr_eval)
-                except ValueError:
-                    pass
-        # normalizar comas decimales a puntos para eval
+            if sim.valor is None:
+                continue
+            # Si el valor actual es Captura, usar el último valor numérico conocido
+            val_usar = sim.valor
+            if sim.valor.startswith("Captura.") and sim.ultimo_valor_numerico is not None:
+                val_usar = sim.ultimo_valor_numerico
+            val_norm = val_usar.replace(",", ".")
+            try:
+                float(val_norm)
+                expr_eval = re.sub(rf'\b{re.escape(nombre)}\b', val_norm, expr_eval)
+            except ValueError:
+                pass
         expr_eval_norm = expr_eval.replace(",", ".")
         try:
             resultado = eval(expr_eval_norm)  # noqa: S307
-            # formatear: entero si no tiene decimales
             if isinstance(resultado, float) and resultado == int(resultado):
                 return str(int(resultado))
             return str(resultado)
         except Exception:
-            return expr  # si no se puede evaluar, guardar la expresión textual
+            # No se pudo evaluar todo — devolver la expresión con sustituciones parciales
+            # evaluar subexpresiones entre paréntesis que sí sean numéricas
+            def _eval_sub(m):
+                try:
+                    r = eval(m.group(1))  # noqa: S307
+                    if isinstance(r, float) and r == int(r):
+                        return str(int(r))
+                    return str(r)
+                except Exception:
+                    return m.group(0)
+            simplificada = re.sub(r'\(([^()]+)\)', _eval_sub, expr_eval_norm)
+            try:
+                resultado = eval(simplificada)  # noqa: S307
+                if isinstance(resultado, float) and resultado == int(resultado):
+                    return str(int(resultado))
+                return str(resultado)
+            except Exception:
+                # añadir espacios alrededor de operadores para legibilidad
+                simplificada = re.sub(r'([+\-*/])', r' \1 ', simplificada)
+                simplificada = re.sub(r'\s+', ' ', simplificada).strip()
+                return simplificada
 
     def _salida(self) -> tuple[str, list[str]]:
         self.consumir("MENSAJE_TEXTO")
@@ -276,12 +396,18 @@ class AnalizadorSintactico:
         self.consumir("PARENTESIS_CI")
         self.consumir("PUNTO_COMA")
 
-        # validar que variables usadas estén declaradas
+        # validar que variables usadas estén declaradas e inicializadas
         for arg in argumentos:
-            if arg.tipo == "IDENTIFICADOR" and not self.tabla.existe(arg.valor):
-                self.errores.append(
-                    f"  ADVERTENCIA: variable '{arg.valor}' usada en Mensaje.Texto() no está declarada."
-                )
+            if arg.tipo == "IDENTIFICADOR":
+                if not self.tabla.existe(arg.valor):
+                    self.errores.append(
+                        f"  ERROR SEMÁNTICO: {_msg(_MSGS_ERROR_SEM)} — variable '{arg.valor}' usada en Mensaje.Texto() no está declarada."
+                    )
+                elif not self.tabla.obtener(arg.valor).inicializado:
+                    self.errores.append(
+                        f"  ERROR SEMÁNTICO: ¡Ajá, mano! La variable '{arg.valor}' está declarada "
+                        f"pero no tiene ningún valor. ¡No la puedes imprimir así, mano!"
+                    )
         return "SALIDA", self.errores
 
     def _expr(self) -> str:
@@ -390,10 +516,15 @@ class GeneradorIntermedio:
             )
 
     def _gen_salida(self, tokens):
-        txt_tok = next((t for t in tokens if t.tipo == "TEXTO_LIT"), None)
-        if txt_tok:
+        partes_print = []
+        for t in tokens:
+            if t.tipo == "TEXTO_LIT":
+                partes_print.append(t.valor)
+            elif t.tipo == "IDENTIFICADOR":
+                partes_print.append(t.valor)
+        if partes_print:
             self.cuadruplas.append(
-                Cuadrupla("PRINT", txt_tok.valor, "", "")
+                Cuadrupla("PRINT", " ".join(partes_print), "", "")
             )
 
     def _gen_expr(self, tokens: list[Token]) -> str:
@@ -688,41 +819,65 @@ def generar_fases(codigo: str, tabla: TablaSimbolos) -> dict:
 
 def _resolver_valor(nombre: str, tabla: TablaSimbolos, _vistos: set = None) -> str:
     """
-    Resuelve el valor final de una variable siguiendo la cadena de asignaciones.
-    Si la expresión contiene otras variables, las sustituye recursivamente.
-    Si alguna depende de Captura, devuelve '<entrada usuario>'.
+    Resuelve el valor final de una variable.
+    - Si el valor ya es un número → lo devuelve.
+    - Si es una expresión con variables → sustituye los que puede y evalúa.
+    - Si no puede evaluar → devuelve la expresión legible.
+    - Si depende de Captura directamente → devuelve la expresión.
     """
     if _vistos is None:
         _vistos = set()
     if nombre in _vistos:
-        return f"<{nombre}>"  # evitar ciclos
+        return f"[{nombre}]"
     _vistos.add(nombre)
 
     sim = tabla.obtener(nombre)
     if sim is None or sim.valor is None:
-        return f"<{nombre}>"
+        return f"[{nombre}]"
 
     val = sim.valor
 
-    # si viene de captura, no se puede resolver
-    if val.startswith("Captura."):
-        return f"<{nombre}: entrada usuario>"
+    # ya es un número puro
+    try:
+        float(val.replace(",", "."))
+        return val
+    except (ValueError, AttributeError):
+        pass
 
-    # intentar evaluar sustituyendo variables conocidas
+    # viene directamente de captura
+    if val.startswith("Captura."):
+        return val  # mostrar "Captura.Entero()" tal cual
+
+    # es una expresión — intentar sustituir variables por sus valores numéricos
     expr = val
+    tiene_captura = False  # bandera: alguna variable depende de Captura
     for var_nombre, var_sim in tabla._tabla.items():
         if var_nombre == nombre:
             continue
-        if var_sim.valor and not var_sim.valor.startswith("Captura."):
-            sub = _resolver_valor(var_nombre, tabla, set(_vistos))
-            # solo sustituir si el resultado es numérico
-            try:
-                float(sub.replace(",", "."))
+        if not re.search(rf'\b{re.escape(var_nombre)}\b', expr):
+            continue
+        # Si la variable viene de Captura pero tiene un valor numérico previo, usarlo
+        if var_sim.valor and var_sim.valor.startswith("Captura."):
+            if var_sim.ultimo_valor_numerico is not None:
+                sub = var_sim.ultimo_valor_numerico
                 expr = re.sub(rf'\b{re.escape(var_nombre)}\b', sub, expr)
-            except ValueError:
-                pass
+            else:
+                tiene_captura = True
+            continue  # ya procesado
+        sub = _resolver_valor(var_nombre, tabla, set(_vistos))
+        try:
+            float(sub.replace(",", "."))
+            expr = re.sub(rf'\b{re.escape(var_nombre)}\b', sub, expr)
+        except ValueError:
+            expr = re.sub(rf'\b{re.escape(var_nombre)}\b', sub, expr)
 
-    # normalizar y evaluar
+    # Si hay variables de Captura, no se puede evaluar numéricamente —
+    # devolver la expresión con espacios legibles alrededor de operadores
+    if tiene_captura:
+        expr_legible = re.sub(r'([+\-*/])', r' \1 ', expr)
+        expr_legible = re.sub(r'\s+', ' ', expr_legible).strip()
+        return expr_legible
+
     expr_norm = expr.replace(",", ".")
     try:
         resultado = eval(expr_norm)  # noqa: S307
@@ -730,7 +885,26 @@ def _resolver_valor(nombre: str, tabla: TablaSimbolos, _vistos: set = None) -> s
             return str(int(resultado))
         return str(resultado)
     except Exception:
-        return val  # devolver la expresión si no se puede evaluar
+        # intentar evaluar subexpresiones entre paréntesis que sean numéricas
+        def eval_subexpr(m):
+            try:
+                r = eval(m.group(1))  # noqa: S307
+                if isinstance(r, float) and r == int(r):
+                    return str(int(r))
+                return str(r)
+            except Exception:
+                return m.group(0)
+        expr_simplificada = re.sub(r'\(([^()]+)\)', eval_subexpr, expr_norm)
+        try:
+            resultado = eval(expr_simplificada)  # noqa: S307
+            if isinstance(resultado, float) and resultado == int(resultado):
+                return str(int(resultado))
+            return str(resultado)
+        except Exception:
+            # añadir espacios alrededor de operadores para legibilidad
+            expr_legible = re.sub(r'([+\-*/])', r' \1 ', expr_simplificada)
+            expr_legible = re.sub(r'\s+', ' ', expr_legible).strip()
+            return expr_legible
 
 
 def compilar(codigo: str) -> None:
@@ -739,7 +913,7 @@ def compilar(codigo: str) -> None:
     lineas  = codigo.strip().split("\n")
 
     print("=" * 65)
-    print("  COMPILADOR – Fase 1 (Léxico) + Fase 2 (Sintáctico)")
+    print("  🌊 COMPILADOR COSTEÑOL — Léxico + Sintáctico")
     print("=" * 65)
 
     total_errores = 0
@@ -751,13 +925,18 @@ def compilar(codigo: str) -> None:
 
         tokens, err_lex = tokenizar(linea, num)
 
-     
-        tipo_sent, err_sint = parser.analizar(tokens)
+        # Si hay errores léxicos, no ejecutar el análisis sintáctico
+        # para evitar errores falsos de "se esperaba PUNTO_COMA"
+        if err_lex:
+            tipo_sent = "ERROR_LEXICO"
+            err_sint = []
+        else:
+            tipo_sent, err_sint = parser.analizar(tokens)
 
         todos_errores = err_lex + err_sint
         total_errores += len(todos_errores)
 
-        estado = "✓ OK" if not todos_errores else f"✗ {len(todos_errores)} error(es)"
+        estado = f"✓ {_msg(_MSGS_OK)}" if not todos_errores else f"✗ {len(todos_errores)} error(es)"
         print(f"\n[Línea {num:>2}] [{tipo_sent:<12}] {estado}")
         print(f"  Código : {linea}")
 
@@ -791,8 +970,8 @@ def compilar(codigo: str) -> None:
     tabla.imprimir()
 
     
-    estado_final = "Bacano" if total_errores == 0 else f"{total_errores} errores , BARRO"
-    print(f"  Resultado: {estado_final}")
+    estado_final = _msg(_MSGS_FINAL_OK) if total_errores == 0 else _msg(_MSGS_FINAL_ERR, n=total_errores)
+    print(f"  {estado_final}")
     print("=" * 65)
 
 
@@ -800,28 +979,29 @@ def compilar(codigo: str) -> None:
 
 if __name__ == "__main__":
     codigo_prueba = """
-
-    
-
-A Entero;    
+A Entero;  
+b Entero;  
 suma Entero;
 pi Real;
 num2 Entero;
 num3 Entero;    
-
 num1 Entero;
+num1= 12;
+num2= 5;
+num3= 13;
 nombre Texto;
 n1 Real;
 asis Logico;
 nombre= Captura.Texto();
 n1= Captura.Real();
 num1= Captura.Entero();
+num2= Captura.Entero();
+num3= Captura.Entero();
 asis=Captura.Logico();
-A=b;
 suma=num1+(num2*num3);
 nombre="Alejandra";
 pi=3.1416;
-Mensaje.Texto("Esto es una prueba");
+Mensaje.Texto("El resultado es:", suma);
 Mensaje.Texto("Hola mundo");
 """
     compilar(codigo_prueba)

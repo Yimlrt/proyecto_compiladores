@@ -33,25 +33,29 @@ TIPOS_DATO     = {"Entero", "Real", "Texto", "Logico"}
 LOGICOS_LIT    = {"verdadero", "falso", "true", "false"}
 
 CODIGO_EJEMPLO = """\
-A Entero;
+A Entero;  
+b Entero;  
 suma Entero;
 pi Real;
 num2 Entero;
-num3 Entero;
+num3 Entero;    
 num1 Entero;
+num1= 12;
+num2= 5;
+num3= 13;
 nombre Texto;
 n1 Real;
 asis Logico;
 nombre= Captura.Texto();
 n1= Captura.Real();
 num1= Captura.Entero();
+num2= Captura.Entero();
+num3= Captura.Entero();
 asis=Captura.Logico();
-A=b;
 suma=num1+(num2*num3);
 nombre="Alejandra";
-pi=3,1416;
-Mensaje.Texto("Esto es una prueba");
-Mensaje.Texto("Hola mundo");
+pi=3.1416;
+Mensaje.Texto("El resultado es:", suma);
 """
 
 
@@ -59,7 +63,7 @@ Mensaje.Texto("Hola mundo");
 class CosteñolIDE(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("COSTEÑOL IDE  —  Compilador")
+        self.title("COSTEÑOL")
         self.geometry("1280x780")
         self.minsize(900, 600)
 
@@ -73,7 +77,7 @@ class CosteñolIDE(ctk.CTk):
                              fg_color="#1e1e2e")
         barra.pack(fill="x", side="top")
 
-        ctk.CTkLabel(barra, text="🌊  COSTEÑOL IDE",
+        ctk.CTkLabel(barra, text="🌊  COSTEÑOL",
                      font=ctk.CTkFont(size=18, weight="bold"),
                      text_color="#4FC3F7").pack(side="left", padx=16)
 
@@ -372,7 +376,7 @@ class CosteñolIDE(ctk.CTk):
                 self._escribir(widget, "\n")
             elif linea.strip().startswith("Salida :"):
                 self._escribir(widget, "  Salida : ", "dim")
-                self._escribir(widget, linea.strip()[8:].strip() + "\n", "mensaje")
+                self._escribir(widget, linea.strip()[9:] + "\n", "mensaje")
             else:
                 self._escribir(widget, linea + "\n")
 
@@ -489,7 +493,10 @@ class CosteñolIDE(ctk.CTk):
             if not linea_s:
                 continue
             tokens, err_lex = tokenizar(linea_s, num)
-            _, err_sint = parser.analizar(tokens)
+            if err_lex:
+                err_sint = []
+            else:
+                _, err_sint = parser.analizar(tokens)
             for e in err_lex + err_sint:
                 errores_totales.append((num, linea_s, e))
 
