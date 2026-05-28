@@ -84,7 +84,8 @@ class CosteñolIDE(ctk.CTk):
         # botones barra
         for texto, cmd, color in [
             ("▶  Compilar",    self._compilar,      "#1565C0"),
-            ("🔍 Solo Léxico", self._solo_lexico,   "#1B5E20"),
+            ("▶▶ Ejecutar",    self._ejecutar,      "#1B5E20"),
+            ("🔍 Solo Léxico", self._solo_lexico,   "#4A235A"),
             ("🗑  Limpiar",    self._limpiar,       "#4A148C"),
             ("📂 Abrir",       self._abrir_archivo, "#37474F"),
             ("💾 Guardar",     self._guardar_archivo,"#37474F"),
@@ -185,11 +186,13 @@ class CosteñolIDE(ctk.CTk):
         self.tab_lexico       = self.tabs.add("🔤 Léxico")
         self.tab_tabla        = self.tabs.add("📋 Tabla Símbolos")
         self.tab_errores      = self.tabs.add("❌ Errores")
+        self.tab_ejecucion    = self.tabs.add("▶ Ejecución")
 
         self.out_compilacion  = self._crear_salida(self.tab_compilacion)
         self.out_lexico       = self._crear_salida(self.tab_lexico)
         self.out_tabla        = self._crear_salida(self.tab_tabla)
         self.out_errores      = self._crear_salida(self.tab_errores)
+        self.out_ejecucion    = self._crear_salida(self.tab_ejecucion)
 
         # ── barra de estado inferior ──────────────────────────────────────────
         self.barra_estado = ctk.CTkFrame(self, height=28, corner_radius=0,
@@ -523,6 +526,230 @@ class CosteñolIDE(ctk.CTk):
                        "\n══════════════════════════════════════════\n", "dim")
         self._cerrar_panel(self.out_errores)
 
+    # ── Acción: EJECUTAR ─────────────────────────────────────────────────────
+    def _ejecutar(self):
+        codigo = self._get_codigo()
+        if not codigo:
+            messagebox.showwarning("Vacío", "El editor está vacío.")
+            return
+
+        # primero compilar para verificar errores
+        tabla = TablaSimbolos()
+        parser = AnalizadorSintactico(tabla)
+        lineas = codigo.strip().split("\n")
+        total_errores = 0
+        for num, linea in enumerate(lineas, 1):
+            linea_s = linea.strip()
+            if not linea_s:
+                continue
+            tokens, err_lex = tokenizar(linea_s, num)
+            if err_lex:
+                total_errores += len(err_lex)
+            else:
+                _, err_sint = parser.analizar(tokens)
+                total_errores += len(err_sint)
+
+        if total_errores > 0:
+            messagebox.showerror("Error", f"Hay {total_errores} error(es) en el código.\nCorrige los errores antes de ejecutar.")
+            return
+
+        # recolectar todas las variables que usan Captura
+        capturas = []
+        for nombre, sim in tabla._tabla.items():
+            if sim.valor and sim.valor.startswith("Captura."):
+                capturas.append((nombre, sim.tipo))
+
+        # pedir valores al usuario mediante diálogo
+        valores_usuario = {}
+        if capturas:
+            valores_usuario = self._dialogo_captura(capturas)
+            if valores_usuario is None:
+                return  # usuario canceló
+
+        # ejecutar con los valores ingresados
+        self._limpiar_panel(self.out_ejecucion)
+        self._escribir(self.out_ejecucion,
+                       "══════════════════════════════════════════\n"
+                       "  EJECUCIÓN DEL PROGRAMA\n"
+                       "══════════════════════════════════════════\n", "header")
+
+        # asignar valores del usuario a la tabla
+        for nombre, valor in valores_usuario.items():
+            tabla.asignar(nombre, valor)
+
+        # re-evaluar asignaciones con los valores reales
+        tabla2 = TablaSimbolos()
+        parser2 = AnalizadorSintactico(tabla2)
+        for num, linea in enumerate(lineas, 1):
+            linea_s = linea.strip()
+            if not linea_s:
+                continue
+            tokens, _ = tokenizar(linea_s, num)
+            if not tokens:
+                continue
+            # si es captura, asignar el valor del usuario
+            if (len(tokens) >= 3 and tokens[0].tipo == "IDENTIFICADOR"
+                    and tokens[1].tipo == "ASIGNACION"
+                    and tokens[2].tipo == "CAPTURA_TIPO"):
+                nombre_var = tokens[0].valor
+                if nombre_var in valores_usuario:
+                    # declarar si no existe
+                    if not tabla2.existe(nombre_var):
+                        sim_orig = tabla._tabla.get(nombre_var)
+                        if sim_orig:
+                            tabla2.declarar(nombre_var, sim_orig.tipo, num)
+                    tabla2.asignar(nombre_var, valores_usuario[nombre_var])
+            else:
+                parser2.analizar(tokens)
+
+        # mostrar salidas (Mensaje.Texto)
+        salidas = []
+        for num, linea in enumerate(lineas, 1):
+            linea_s = linea.strip()
+            if not linea_s:
+                continue
+            tokens, _ = tokenizar(linea_s, num)
+            if not tokens or tokens[0].tipo != "MENSAJE_TEXTO":
+                continue
+            partes = []
+            for t in tokens[1:]:
+                if t.tipo == "TEXTO_LIT":
+                    partes.append(t.valor.strip('"'))
+                elif t.tipo == "IDENTIFICADOR":
+                    # buscar valor en tabla2 primero, luego tabla
+                    val = None
+                    sim2 = tabla2.obtener(t.valor)
+                    if sim2 and sim2.valor and not sim2.valor.startswith("Captura."):
+                        val = sim2.valor
+                    else:
+                        sim1 = tabla.obtener(t.valor)
+                        if sim1 and sim1.valor:
+                            val = sim1.valor
+                    if val:
+                        # intentar evaluar expresión con valores reales
+                        val = self._evaluar_con_tabla(val, tabla, tabla2, valores_usuario)
+                    partes.append(val if val else f"<{t.valor}>")
+                elif t.tipo in ("PARENTESIS_CI", "PUNTO_COMA"):
+                    break
+            salidas.append(" ".join(partes))
+
+        if salidas:
+            self._escribir(self.out_ejecucion, "\n  📤 Salida del programa:\n\n", "bold")
+            for s in salidas:
+                self._escribir(self.out_ejecucion, f"  {s}\n", "ok")
+        else:
+            self._escribir(self.out_ejecucion, "\n  (sin salidas Mensaje.Texto)\n", "dim")
+
+        self._escribir(self.out_ejecucion,
+                       "\n══════════════════════════════════════════\n", "dim")
+        self._cerrar_panel(self.out_ejecucion)
+        self.tabs.set("▶ Ejecución")
+        self.lbl_estado.configure(text="▶ Ejecución completada.")
+
+    def _evaluar_con_tabla(self, expr: str, tabla, tabla2, valores_usuario: dict) -> str:
+        """Evalúa una expresión sustituyendo variables por sus valores reales."""
+        import re as _re
+        e = expr
+        # sustituir con valores del usuario primero
+        for nombre, val in valores_usuario.items():
+            try:
+                float(str(val).replace(",", "."))
+                e = _re.sub(rf'\b{_re.escape(nombre)}\b', str(val).replace(",", "."), e)
+            except ValueError:
+                pass
+        # sustituir con tabla2
+        for nombre, sim in tabla2._tabla.items():
+            if sim.valor and not sim.valor.startswith("Captura."):
+                try:
+                    float(str(sim.valor).replace(",", "."))
+                    e = _re.sub(rf'\b{_re.escape(nombre)}\b', str(sim.valor).replace(",", "."), e)
+                except ValueError:
+                    pass
+        # sustituir con tabla original
+        for nombre, sim in tabla._tabla.items():
+            if sim.valor and not sim.valor.startswith("Captura."):
+                try:
+                    float(str(sim.valor).replace(",", "."))
+                    e = _re.sub(rf'\b{_re.escape(nombre)}\b', str(sim.valor).replace(",", "."), e)
+                except ValueError:
+                    pass
+        e = e.replace(",", ".")
+        try:
+            resultado = eval(e)  # noqa: S307
+            if isinstance(resultado, float) and resultado == int(resultado):
+                return str(int(resultado))
+            return str(resultado)
+        except Exception:
+            return expr
+
+    def _dialogo_captura(self, capturas: list) -> dict | None:
+        """Muestra un diálogo pidiendo los valores de cada variable Captura."""
+        dialogo = ctk.CTkToplevel(self)
+        dialogo.title("Ingreso de datos")
+        dialogo.geometry("420x" + str(80 + len(capturas) * 70))
+        dialogo.resizable(False, False)
+        dialogo.grab_set()
+
+        ctk.CTkLabel(dialogo,
+                     text="🌊  Ingresa los valores del programa",
+                     font=ctk.CTkFont(size=14, weight="bold"),
+                     text_color="#4FC3F7").pack(pady=(16, 8))
+
+        entradas = {}
+        for nombre, tipo in capturas:
+            frame = ctk.CTkFrame(dialogo, fg_color="transparent")
+            frame.pack(fill="x", padx=24, pady=6)
+            ctk.CTkLabel(frame,
+                         text=f"{nombre}  ({tipo})",
+                         width=140, anchor="w",
+                         font=ctk.CTkFont(size=13)).pack(side="left")
+            entrada = ctk.CTkEntry(frame, width=200,
+                                   placeholder_text=f"Ingresa un {tipo.lower()}")
+            entrada.pack(side="left", padx=8)
+            entradas[nombre] = (entrada, tipo)
+
+        resultado = {"valores": None}
+
+        def confirmar():
+            valores = {}
+            for nombre, (entrada, tipo) in entradas.items():
+                val = entrada.get().strip()
+                if not val:
+                    messagebox.showwarning("Falta valor",
+                                           f"Ingresa un valor para '{nombre}'",
+                                           parent=dialogo)
+                    return
+                # validar tipo
+                try:
+                    if tipo == "Entero":
+                        int(val)
+                    elif tipo == "Real":
+                        float(val.replace(",", "."))
+                    elif tipo == "Logico":
+                        if val.lower() not in ("verdadero", "falso", "true", "false"):
+                            raise ValueError
+                except ValueError:
+                    messagebox.showwarning("Tipo inválido",
+                                           f"'{val}' no es un valor válido para {nombre} ({tipo})",
+                                           parent=dialogo)
+                    return
+                valores[nombre] = val.replace(",", ".")
+            resultado["valores"] = valores
+            dialogo.destroy()
+
+        def cancelar():
+            dialogo.destroy()
+
+        frame_btn = ctk.CTkFrame(dialogo, fg_color="transparent")
+        frame_btn.pack(pady=16)
+        ctk.CTkButton(frame_btn, text="▶ Ejecutar", command=confirmar,
+                      fg_color="#1565C0", width=120).pack(side="left", padx=8)
+        ctk.CTkButton(frame_btn, text="Cancelar", command=cancelar,
+                      fg_color="#4A148C", width=100).pack(side="left", padx=8)
+
+        self.wait_window(dialogo)
+        return resultado["valores"]
+
     # ── Acciones de archivo ───────────────────────────────────────────────────
     def _abrir_archivo(self):
         ruta = filedialog.askopenfilename(
@@ -547,7 +774,7 @@ class CosteñolIDE(ctk.CTk):
     def _limpiar(self):
         self.editor.delete("1.0", "end")
         for w in (self.out_compilacion, self.out_lexico,
-                  self.out_tabla, self.out_errores):
+                  self.out_tabla, self.out_errores, self.out_ejecucion):
             self._limpiar_panel(w)
             self._cerrar_panel(w)
         self._actualizar_numeros()
