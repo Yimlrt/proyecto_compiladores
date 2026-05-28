@@ -1,15 +1,17 @@
-# Proyecto: Compilador Costeñol
+# 🌊 Proyecto: Compilador Costeñol
 
 **Integrantes:**
 - Emanuel Orozco
 - Vanelly Ariza
 - Yimileth Manga
 
+> Proyecto de Compiladores — Corporación Universitaria del Caribe (CUL)
+
 ---
 
 ## 📝 Descripción
 
-Este proyecto es un compilador para el lenguaje **Costeñol**, desarrollado en Python. Incluye un analizador léxico, un analizador sintáctico, una tabla de símbolos y una interfaz gráfica (IDE) para escribir, compilar y guardar código Costeñol.
+Este proyecto es un compilador para el lenguaje **Costeñol**, desarrollado en Python. Incluye un analizador léxico, un analizador sintáctico, un analizador semántico, una tabla de símbolos y una interfaz gráfica (IDE) completa para escribir, compilar y guardar código Costeñol.
 
 ---
 
@@ -17,7 +19,7 @@ Este proyecto es un compilador para el lenguaje **Costeñol**, desarrollado en P
 
 | Archivo | Descripción |
 |---|---|
-| `compi.py` | Núcleo del compilador: tokenizador, analizador sintáctico y tabla de símbolos |
+| `compi.py` | Núcleo del compilador: tokenizador, analizador sintáctico, semántico y tabla de símbolos |
 | `ide.py` | Interfaz gráfica del IDE construida con CustomTkinter |
 | `tokens.py` | Script auxiliar del analizador léxico |
 | `prueba.txt` | Archivo de ejemplo con código fuente Costeñol |
@@ -57,24 +59,24 @@ python compi.py
 El IDE cuenta con las siguientes características:
 
 - **Editor de código** con numeración de líneas y resaltado de sintaxis en tiempo real
-- **▶ Compilar** — ejecuta el análisis léxico + sintáctico completo y muestra los resultados
-- **🔍 Solo Léxico** — muestra únicamente los tokens identificados por línea
-- **📋 Tabla de Símbolos** — lista todas las variables declaradas con su tipo, valor y estado de inicialización
+- **▶ Compilar** — ejecuta todas las fases del compilador y muestra los resultados por pestaña
+- **🔍 Solo Léxico** — muestra únicamente los tokens identificados por línea con su posición
+- **📋 Tabla de Símbolos** — lista todas las variables declaradas con tipo, valor, estado de inicialización y línea
 - **❌ Errores** — resumen de todos los errores léxicos, sintácticos y semánticos encontrados
 - **📂 Abrir** — carga un archivo de código desde el sistema de archivos
-- **💾 Guardar** — exporta el código como archivo `.pqek` (formato nativo Costeñol)
+- **💾 Guardar** — exporta el código como archivo `.pqpk` (formato nativo Costeñol)
 - **📋 Ejemplo** — carga un código de ejemplo predefinido
 - **🗑 Limpiar** — limpia el editor y todos los paneles de resultados
 
 ### Formato de guardado
 
-Al guardar, el IDE exporta el archivo con extensión **`.pqek`**, que es el formato nativo del lenguaje Costeñol. También es posible guardar como `.txt` desde el mismo diálogo.
+Al guardar, el IDE exporta el archivo con extensión **`.pqpk`**, que es el formato nativo del lenguaje Costeñol. También es posible guardar como `.txt` desde el mismo diálogo.
 
 ---
 
 ## 🎨 Resaltado de Sintaxis en el Editor
 
-El editor colorea el código en tiempo real mientras escribes. Cada elemento del lenguaje tiene un color asignado:
+El editor colorea el código **en tiempo real** mientras escribes. Cada elemento del lenguaje tiene un color asignado:
 
 | Color | Elemento | Ejemplo |
 |---|---|---|
@@ -95,12 +97,12 @@ El editor colorea el código en tiempo real mientras escribes. Cada elemento del
 
 ### Tipos de dato
 
-| Tipo | Descripción |
-|---|---|
-| `Entero` | Número entero |
-| `Real` | Número decimal |
-| `Texto` | Cadena de caracteres |
-| `Logico` | Valor booleano (`verdadero` / `falso`) |
+| Tipo | Descripción | Ejemplo |
+|---|---|---|
+| `Entero` | Número entero | `num1 Entero;` |
+| `Real` | Número decimal (usa coma) | `pi Real;` → `pi=3,1416;` |
+| `Texto` | Cadena de caracteres | `nombre Texto;` |
+| `Logico` | Valor booleano | `asis Logico;` |
 
 ### Sentencias soportadas
 
@@ -108,30 +110,51 @@ El editor colorea el código en tiempo real mientras escribes. Cada elemento del
 # Declaración de variable
 nombre Tipo;
 
-# Captura de entrada
+# Captura de entrada del usuario
 variable= Captura.Tipo();
 
-# Asignación
+# Asignación con expresión
 variable=expresion;
 
-# Salida por pantalla
+# Salida por pantalla (acepta texto y variables)
 Mensaje.Texto("texto");
+Mensaje.Texto("El resultado es:", variable);
 ```
 
-### Operadores
+### Operadores aritméticos
 
-`+`, `-`, `*`, `/`, `=`, `==`, `!=`, `<`, `>`, `<=`, `>=`
+| Operador | Descripción |
+|---|---|
+| `+` | Suma |
+| `-` | Resta |
+| `*` | Multiplicación |
+| `/` | División |
+
+### Reglas importantes
+
+- Toda sentencia debe terminar con `;`
+- No se permiten tokens después del `;`
+- No se permiten operadores consecutivos (`*+`, `++`, etc.)
+- Las variables deben declararse antes de usarse
+- Los tipos deben ser compatibles en operaciones y capturas
+- Solo `Entero` y `Real` pueden usarse en operaciones aritméticas
 
 ### Ejemplo de código Costeñol
 
 ```
 num1 Entero;
+num2 Entero;
+num3 Entero;
+suma Entero;
 nombre Texto;
 pi Real;
 num1= Captura.Entero();
+num2= Captura.Entero();
+num3= Captura.Entero();
+suma=num1+(num2*num3);
 nombre="Alejandra";
 pi=3,1416;
-Mensaje.Texto("Hola mundo");
+Mensaje.Texto("El resultado es:", suma);
 ```
 
 ---
@@ -140,5 +163,28 @@ Mensaje.Texto("Hola mundo");
 
 1. **Análisis Léxico** — divide el código en tokens clasificados (tipos, identificadores, literales, operadores, etc.)
 2. **Análisis Sintáctico** — verifica que las sentencias sigan la gramática del lenguaje
-3. **Análisis Semántico** — comprueba que las variables estén declaradas antes de usarse y que los tipos sean compatibles
+3. **Análisis Semántico** — comprueba que:
+   - Las variables estén declaradas antes de usarse
+   - Los tipos sean compatibles en operaciones y capturas
+   - No se usen variables de tipo `Texto` o `Logico` en operaciones aritméticas
+   - No haya variables sin inicializar siendo usadas
 4. **Tabla de Símbolos** — registra todas las variables con su tipo, valor asignado y línea de declaración
+5. **Generación de Código Intermedio** — produce cuádruplas en formato de tres direcciones
+6. **Optimización de Código** — aplica plegado de constantes, eliminación de redundancias, propagación de copias y eliminación de temporales muertos
+7. **Generación de Código Final** — traduce las cuádruplas optimizadas a pseudoensamblador (`ALLOC`, `LOAD`, `STORE`, `MOV`, `ADD/SUB/MUL/DIV`, `IN`, `OUT`, `HALT`)
+
+---
+
+## ❌ Detección de Errores
+
+El compilador detecta y reporta los siguientes tipos de errores:
+
+| Tipo | Ejemplo |
+|---|---|
+| **Error Léxico** | Carácter no reconocido: `num1= 5@;` |
+| **Error Sintáctico** | Tokens después del `;`: `num1=5;*` |
+| **Error Sintáctico** | Operadores consecutivos: `suma=num1*+num2;` |
+| **Error Semántico** | Variable no declarada: usar `x` sin `x Entero;` |
+| **Error Semántico** | Tipo incompatible en captura: declarar `Entero` y capturar como `Texto` |
+| **Error Semántico** | Tipo incompatible en operación: usar variable `Texto` en suma |
+| **Error Semántico** | Variable declarada dos veces |
