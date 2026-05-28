@@ -239,6 +239,7 @@ class AnalizadorSintactico:
         id_tok  = self.consumir("IDENTIFICADOR")
         tip_tok = self.consumir("TIPO_DATO")
         self.consumir("PUNTO_COMA")
+        self._validar_fin_linea()
         if not self.errores and id_tok and tip_tok:
             ok, msg = self.tabla.declarar(id_tok.valor, tip_tok.valor, id_tok.linea)
             if not ok:
@@ -250,6 +251,7 @@ class AnalizadorSintactico:
         self.consumir("ASIGNACION")
         cap_tok = self.consumir("CAPTURA_TIPO")
         self.consumir("PUNTO_COMA")
+        self._validar_fin_linea()
         if not self.errores and id_tok and cap_tok:
             # verificar que la variable esté declarada
             if not self.tabla.existe(id_tok.valor):
@@ -267,6 +269,18 @@ class AnalizadorSintactico:
                     self.tabla.asignar(id_tok.valor, f"Captura.{tipo_captura}()")
         return "CAPTURA", self.errores
 
+    def _validar_fin_linea(self):
+        """Detecta tokens inesperados después del punto y coma."""
+        if self.actual() is not None:
+            sobrantes = []
+            while self.actual():
+                sobrantes.append(self.actual().valor)
+                self.pos += 1
+            self.errores.append(
+                f"  ERROR SINTÁCTICO: tokens inesperados después del ';': "
+                f"{''.join(sobrantes)}"
+            )
+
     def _asignacion(self) -> tuple[str, list[str]]:
         id_tok = self.consumir("IDENTIFICADOR")
         self.consumir("ASIGNACION")
@@ -278,6 +292,15 @@ class AnalizadorSintactico:
         # reconstruir expr con paréntesis para eval
         expr_str = "".join(t.valor for t in expr_tokens)
         self.consumir("PUNTO_COMA")
+        self._validar_fin_linea()
+
+        # ── validar operadores consecutivos en la expresión ───────────────────
+        for i in range(len(expr_tokens) - 1):
+            if expr_tokens[i].tipo == "OPERADOR" and expr_tokens[i+1].tipo == "OPERADOR":
+                self.errores.append(
+                    f"  ERROR SINTÁCTICO: operadores consecutivos inválidos: "
+                    f"'{expr_tokens[i].valor}{expr_tokens[i+1].valor}'"
+                )
 
         if not self.errores and id_tok:
             if not self.tabla.existe(id_tok.valor):
@@ -395,6 +418,7 @@ class AnalizadorSintactico:
             t = self.actual()
         self.consumir("PARENTESIS_CI")
         self.consumir("PUNTO_COMA")
+        self._validar_fin_linea()
 
         # validar que variables usadas estén declaradas e inicializadas
         for arg in argumentos:
