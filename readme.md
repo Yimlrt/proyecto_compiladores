@@ -62,13 +62,13 @@ El IDE cuenta con las siguientes características:
 - **📋 Tabla de Símbolos** — lista todas las variables declaradas con su tipo, valor y estado de inicialización
 - **❌ Errores** — resumen de todos los errores léxicos, sintácticos y semánticos encontrados
 - **📂 Abrir** — carga un archivo de código desde el sistema de archivos
-- **💾 Guardar** — exporta el código como archivo `.pqpk` (formato nativo Costeñol)
+- **💾 Guardar** — exporta el código como archivo `.pqek` (formato nativo Costeñol)
 - **📋 Ejemplo** — carga un código de ejemplo predefinido
 - **🗑 Limpiar** — limpia el editor y todos los paneles de resultados
 
 ### Formato de guardado
 
-Al guardar, el IDE exporta el archivo con extensión **`.pqpk`**, que es el formato nativo del lenguaje Costeñol. También es posible guardar como `.txt` desde el mismo diálogo.
+Al guardar, el IDE exporta el archivo con extensión **`.pqek`**, que es el formato nativo del lenguaje Costeñol. También es posible guardar como `.txt` desde el mismo diálogo.
 
 ---
 
