@@ -294,6 +294,15 @@ class AnalizadorSintactico:
         self.consumir("PUNTO_COMA")
         self._validar_fin_linea()
 
+        # ── validar paréntesis balanceados ───────────────────────────────────
+        apertura = sum(1 for t in expr_tokens if t.tipo == "PARENTESIS_AP")
+        cierre   = sum(1 for t in expr_tokens if t.tipo == "PARENTESIS_CI")
+        if apertura != cierre:
+            self.errores.append(
+                f"  ERROR SINTÁCTICO: paréntesis desbalanceados — "
+                f"{apertura} '(' y {cierre} ')' en la expresión."
+            )
+
         # ── validar operadores consecutivos en la expresión ───────────────────
         for i in range(len(expr_tokens) - 1):
             if expr_tokens[i].tipo == "OPERADOR" and expr_tokens[i+1].tipo == "OPERADOR":
