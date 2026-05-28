@@ -72,6 +72,25 @@ Al guardar, el IDE exporta el archivo con extensión **`.pqek`**, que es el form
 
 ---
 
+## 🎨 Resaltado de Sintaxis en el Editor
+
+El editor colorea el código en tiempo real mientras escribes. Cada elemento del lenguaje tiene un color asignado:
+
+| Color | Elemento | Ejemplo |
+|---|---|---|
+| 🔵 Azul claro | Tipos de dato | `Entero`, `Real`, `Texto`, `Logico` |
+| 🟢 Verde | Captura de entrada | `Captura.Entero()`, `Captura.Texto()` |
+| 🟠 Naranja | Salida por pantalla | `Mensaje.Texto(` |
+| 🩷 Rosa | Cadenas de texto | `"Alejandra"`, `"Hola mundo"` |
+| 🟣 Morado | Números literales | `12`, `3.1416`, `5` |
+| 🩵 Cian | Valores lógicos | `verdadero`, `falso` |
+| 🟡 Amarillo | Operadores | `+`, `-`, `*`, `/`, `=` |
+| ⚪ Blanco | Identificadores (variables) | `num1`, `suma`, `nombre` |
+
+> **Indicador de error visual:** Si una palabra está escrita incorrectamente o no corresponde a ningún elemento reconocido del lenguaje, aparece en **blanco sin resaltado**. Esto sirve como señal visual de que algo puede estar mal antes de compilar.
+
+---
+
 ## 📊 Especificaciones del Lenguaje
 
 ### Tipos de dato
